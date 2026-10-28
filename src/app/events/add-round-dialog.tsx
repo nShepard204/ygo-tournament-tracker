@@ -138,6 +138,8 @@ function AddRoundForm({
             min={40}
             max={60}
             defaultValue={40}
+            inputMode="numeric"
+            pattern="[0-9]*"
           />
         </div>
       </div>
