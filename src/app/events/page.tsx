@@ -35,7 +35,7 @@ async function EventLog() {
     <>
       <p className="text-sm text-muted-foreground">Your {events.length} most recent events</p>
       {events.map((e) => (
-        <EventCard key={e.id} event={e} showRounds />
+        <EventCard key={e.id} event={e} />
       ))}
     </>
   );

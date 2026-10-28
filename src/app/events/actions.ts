@@ -56,8 +56,12 @@ export async function createEvent(
 const AddRoundSchema = z.object({
   roundNum: z.coerce.number().int().min(1, "Round must be 1 or higher"),
   tableNum: z.coerce.number().int().min(0).optional(),
-  roundResult: z.enum(["win", "loss"], { error: "Pick win or loss" }).transform((v) => v === "win"),
-  dieRollResult: z.boolean(),
+  roundResult: z
+    .enum(["win", "loss"], { error: "Pick whether you won the round" })
+    .transform((v) => v === "win"),
+  dieRollResult: z
+    .enum(["won", "lost"], { error: "Pick whether you won the die roll" })
+    .transform((v) => v === "won"),
   opponentsName: z.string().trim().max(120).default(""),
   opponentsDeck: z.string().trim().max(120).default(""),
   opponentsDeckSize: z.coerce.number().int().min(40, "Decks are 40–60 cards").max(60, "Decks are 40–60 cards").default(40),
@@ -77,7 +81,7 @@ export async function addRoundToLatestEvent(
     roundNum: formData.get("roundNum"),
     tableNum: formData.get("tableNum") || undefined,
     roundResult: formData.get("roundResult"),
-    dieRollResult: formData.get("dieRollResult") === "on",
+    dieRollResult: formData.get("dieRollResult"),
     opponentsName: formData.get("opponentsName") ?? undefined,
     opponentsDeck: formData.get("opponentsDeck") ?? undefined,
     opponentsDeckSize: formData.get("opponentsDeckSize") || undefined,

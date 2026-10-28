@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, type ReactElement } from "react";
+import { Check, Dice6, Trophy, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -91,30 +92,24 @@ function AddRoundForm({
           />
         </div>
       </div>
-      <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-medium">Result</legend>
-        <div className="grid grid-cols-2 gap-2">
-          {(["win", "loss"] as const).map((value) => (
-            <label
-              key={value}
-              className="flex h-9 cursor-pointer items-center justify-center rounded-lg border text-sm capitalize has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground"
-            >
-              <input
-                type="radio"
-                name="roundResult"
-                value={value}
-                required
-                className="sr-only"
-              />
-              {value}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="dieRollResult" className="size-4" />
-        Won the die roll
-      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <YesNoCard
+          name="roundResult"
+          legend="Round result"
+          prompt="Won the round?"
+          Icon={Trophy}
+          yes={{ value: "win", label: "Won the round" }}
+          no={{ value: "loss", label: "Lost the round" }}
+        />
+        <YesNoCard
+          name="dieRollResult"
+          legend="Die roll"
+          prompt="Won the die roll?"
+          Icon={Dice6}
+          yes={{ value: "won", label: "Won the die roll" }}
+          no={{ value: "lost", label: "Lost the die roll" }}
+        />
+      </div>
       <div className="grid gap-2">
         <Label htmlFor="opponentsName">Opponent</Label>
         <Input id="opponentsName" name="opponentsName" placeholder="Name" />
@@ -151,5 +146,53 @@ function AddRoundForm({
         {pending ? "Saving…" : "Add round"}
       </Button>
     </form>
+  );
+}
+
+type YesNoOption = { value: string; label: string };
+
+// A radio pair styled as a card: an icon and prompt above a green check and a
+// red X. Not `required`: iOS browsers often block submit without showing why,
+// so the server action's validation error is shown in the form instead.
+function YesNoCard({
+  name,
+  legend,
+  prompt,
+  Icon,
+  yes,
+  no,
+}: {
+  name: string;
+  legend: string;
+  prompt: string;
+  Icon: LucideIcon;
+  yes: YesNoOption;
+  no: YesNoOption;
+}) {
+  const options = [
+    { ...yes, OptionIcon: Check, checkedClass: "has-checked:border-green-600 has-checked:bg-green-600 has-checked:text-white" },
+    { ...no, OptionIcon: X, checkedClass: "has-checked:border-red-600 has-checked:bg-red-600 has-checked:text-white" },
+  ];
+
+  return (
+    <fieldset className="flex min-w-0 flex-col items-center gap-2 rounded-xl border bg-card px-2 py-3">
+      <legend className="sr-only">{legend}</legend>
+      <Icon aria-hidden className="size-8 text-muted-foreground" strokeWidth={1.5} />
+      <p aria-hidden className="text-center text-xs font-medium">
+        {prompt}
+      </p>
+      <div className="flex gap-3">
+        {options.map(({ value, label, OptionIcon, checkedClass }) => (
+          <label
+            key={value}
+            title={label}
+            className={`flex size-10 cursor-pointer items-center justify-center rounded-full border-2 border-input text-muted-foreground transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 ${checkedClass}`}
+          >
+            <input type="radio" name={name} value={value} aria-label={label} className="sr-only" />
+            <OptionIcon className="size-5" strokeWidth={2.5} />
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
