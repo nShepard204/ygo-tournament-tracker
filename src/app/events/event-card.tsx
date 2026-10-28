@@ -70,12 +70,12 @@ export function EventCard({ event: e }: { event: EventDTO }) {
             {e.eventFormat} ·{" "}
             <LocalDateTime iso={e.eventDateTime} options={EVENT_TIME_FORMAT} />
             {e.eventLocation ? ` · ${e.eventLocation}` : ""}
-            {e.playerCount ? ` · ${e.playerCount} players` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-1 text-sm text-muted-foreground">
           <p>
-            Deck: {e.deck || "—"} · Record: {wins}-{losses}
+            {/* A blank Players field is stored as 0, so show that as unknown */}
+            Deck: {e.deck || "—"} · Players: {e.playerCount || "—"} · Record: {wins}-{losses}
           </p>
           {e.eventNotes && <p>{e.eventNotes}</p>}
         </CardContent>
