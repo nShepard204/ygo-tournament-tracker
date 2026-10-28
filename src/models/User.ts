@@ -1,5 +1,11 @@
 import "server-only";
-import { Schema, model, models, type InferSchemaType, type Model } from "mongoose";
+import {
+  Schema,
+  model,
+  models,
+  type InferSchemaType,
+  type Model,
+} from "mongoose";
 import { EVENT_FORMATS } from "@/lib/constants";
 
 // One document per player: identity mirrored from Clerk, with their events
@@ -40,8 +46,9 @@ const UserSchema = new Schema({
 export type UserDoc = InferSchemaType<typeof UserSchema>;
 
 // Collection name is set explicitly; Mongoose would otherwise pluralize to "users".
-const COLLECTION = process.env.MONGODB_COLLECTION ?? "development";
+const COLLECTION = process.env.MONGODB_COLLECTION ?? "app_data";
 
 // Reuse the compiled model across hot reloads to avoid OverwriteModelError.
 export const User: Model<UserDoc> =
-  (models.User as Model<UserDoc>) || model<UserDoc>("User", UserSchema, COLLECTION);
+  (models.User as Model<UserDoc>) ||
+  model<UserDoc>("User", UserSchema, COLLECTION);
