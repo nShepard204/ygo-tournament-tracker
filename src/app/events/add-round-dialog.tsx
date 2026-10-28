@@ -33,9 +33,8 @@ export function AddRoundDialog({
           <DialogTitle>Add round {latestEvent.nextRoundNum}</DialogTitle>
           <DialogDescription>
             To {latestEvent.eventName || "Untitled event"} ·{" "}
-            {new Date(latestEvent.eventDateTime).toLocaleDateString(undefined, {
-              timeZone: "UTC",
-            })}
+            {/* Dialog content only renders in the browser, so this uses the viewer's time zone */}
+            {new Date(latestEvent.eventDateTime).toLocaleDateString()}
           </DialogDescription>
         </DialogHeader>
         <AddRoundForm

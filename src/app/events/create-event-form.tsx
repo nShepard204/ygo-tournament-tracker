@@ -8,7 +8,10 @@ import { EVENT_FORMATS } from "@/lib/constants";
 import { createEvent, type CreateEventState } from "./actions";
 
 export function CreateEventForm({ onSuccess }: { onSuccess?: () => void }) {
-  const [state, formAction, pending] = useActionState<CreateEventState, FormData>(createEvent, {});
+  const [state, formAction, pending] = useActionState<
+    CreateEventState,
+    FormData
+  >(createEvent, {});
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -17,11 +20,27 @@ export function CreateEventForm({ onSuccess }: { onSuccess?: () => void }) {
     onSuccess?.();
   }, [state, onSuccess]);
 
+  // datetime-local values carry no time zone. Convert in the browser, which knows
+  // the user's zone, so the server stores the right instant wherever it runs.
+  const submit = (formData: FormData) => {
+    const local = formData.get("eventDateTime");
+    const date = typeof local === "string" && local ? new Date(local) : null;
+    if (date && !Number.isNaN(date.getTime())) {
+      formData.set("eventDateTime", date.toISOString());
+    }
+    formAction(formData);
+  };
+
   return (
-    <form ref={formRef} action={formAction} className="grid gap-4">
+    <form ref={formRef} action={submit} className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="eventName">Event name</Label>
-        <Input id="eventName" name="eventName" placeholder="Locals – Friday Night" required />
+        <Input
+          id="eventName"
+          name="eventName"
+          placeholder="Locals – Friday Night"
+          required
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
@@ -41,16 +60,33 @@ export function CreateEventForm({ onSuccess }: { onSuccess?: () => void }) {
         </div>
         <div className="grid gap-2">
           <Label htmlFor="playerCount">Players</Label>
-          <Input id="playerCount" name="playerCount" type="number" min={0} placeholder="0" />
+          <Input
+            id="playerCount"
+            name="playerCount"
+            type="number"
+            min={0}
+            placeholder="0"
+            inputMode="numeric"
+            pattern="[0-9]*"
+          />
         </div>
       </div>
       <div className="grid gap-2">
         <Label htmlFor="eventDateTime">Date &amp; time</Label>
-        <Input id="eventDateTime" name="eventDateTime" type="datetime-local" required />
+        <Input
+          id="eventDateTime"
+          name="eventDateTime"
+          type="datetime-local"
+          required
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="eventLocation">Location</Label>
-        <Input id="eventLocation" name="eventLocation" placeholder="Card shop name" />
+        <Input
+          id="eventLocation"
+          name="eventLocation"
+          placeholder="Card shop name"
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="deck">Deck played</Label>

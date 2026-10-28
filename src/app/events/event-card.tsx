@@ -1,5 +1,17 @@
+import { LocalDateTime } from "@/components/local-date-time";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { EventDTO } from "@/lib/dal";
+
+// e.g. "Oct 28, 2026, 7:00 PM EDT". Spelled out field by field because
+// timeZoneName can't be combined with dateStyle/timeStyle (Intl throws).
+const EVENT_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "short",
+};
 
 export function EventCard({ event: e, showRounds = false }: { event: EventDTO; showRounds?: boolean }) {
   const wins = e.roundLog.filter((r) => r.roundResult).length;
@@ -18,11 +30,7 @@ export function EventCard({ event: e, showRounds = false }: { event: EventDTO; s
         </CardTitle>
         <CardDescription>
           {e.eventFormat} ·{" "}
-          {new Date(e.eventDateTime).toLocaleString(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short",
-            timeZone: "UTC",
-          })}
+          <LocalDateTime iso={e.eventDateTime} options={EVENT_TIME_FORMAT} />
           {e.eventLocation ? ` · ${e.eventLocation}` : ""}
           {e.playerCount ? ` · ${e.playerCount} players` : ""}
         </CardDescription>
