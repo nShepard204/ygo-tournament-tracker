@@ -32,11 +32,9 @@ export async function POST(req: NextRequest) {
         {
           $set: {
             email: primaryEmail,
-            username: u.username ?? undefined,
-            displayName: [u.first_name, u.last_name].filter(Boolean).join(" ") || undefined,
-            imageUrl: u.image_url,
+            name: [u.first_name, u.last_name].filter(Boolean).join(" "),
           },
-          $setOnInsert: { clerkId: u.id },
+          $setOnInsert: { clerkId: u.id, eventLog: [] },
         },
         { upsert: true },
       );
