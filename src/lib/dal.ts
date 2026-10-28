@@ -3,6 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { connectDB } from "@/lib/db";
 import { User } from "@/models/User";
+import { connection } from "next/server";
 
 // Data Access Layer: every read/write goes through here so authorization
 // lives in one place. Proxy redirects are only an optimistic first check.
@@ -29,7 +30,9 @@ export async function ensureUserRecord(userId: string) {
       $setOnInsert: {
         clerkId: userId,
         email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
-        name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" "),
+        name: [clerkUser.firstName, clerkUser.lastName]
+          .filter(Boolean)
+          .join(" "),
         eventLog: [],
       },
     },
@@ -64,6 +67,7 @@ export type EventDTO = {
 };
 
 export async function listMyEvents(): Promise<EventDTO[]> {
+  await connection();
   const userId = await requireUserId();
   await connectDB();
 
