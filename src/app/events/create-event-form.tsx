@@ -7,13 +7,15 @@ import { Label } from "@/components/ui/label";
 import { EVENT_FORMATS } from "@/lib/constants";
 import { createEvent, type CreateEventState } from "./actions";
 
-export function CreateEventForm() {
+export function CreateEventForm({ onSuccess }: { onSuccess?: () => void }) {
   const [state, formAction, pending] = useActionState<CreateEventState, FormData>(createEvent, {});
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state.success) formRef.current?.reset();
-  }, [state]);
+    if (!state.success) return;
+    formRef.current?.reset();
+    onSuccess?.();
+  }, [state, onSuccess]);
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-4">

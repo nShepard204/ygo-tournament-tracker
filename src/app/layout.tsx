@@ -35,6 +35,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
+        <head>
+          <meta
+            name="format-detection"
+            content="telephone=no, date=no, email=no, address=no"
+          />
+          <meta name="darkreader-lock" />
+        </head>
         <body className="min-h-full flex flex-col">
           <Script id="theme-init" strategy="beforeInteractive">
             {themeInitScript}
@@ -48,7 +55,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <div className="flex items-center gap-2">
                 <Show when="signed-out">
                   <SignInButton>
-                    <Button variant="ghost" size="sm">Sign in</Button>
+                    <Button variant="ghost" size="sm">
+                      Sign in
+                    </Button>
                   </SignInButton>
                   <SignUpButton>
                     <Button size="sm">Sign up</Button>

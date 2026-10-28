@@ -66,7 +66,35 @@ export type EventDTO = {
   lastUpdated: string | null;
 };
 
-export async function listMyEvents(): Promise<EventDTO[]> {
+export type LatestEventSummary = {
+  eventName: string;
+  eventDateTime: string;
+  nextRoundNum: number;
+};
+
+// The most recently *created* event (last pushed onto eventLog), which is not
+// necessarily the one with the latest date.
+export async function getLatestCreatedEvent(): Promise<LatestEventSummary | null> {
+  await connection();
+  const userId = await requireUserId();
+  await connectDB();
+
+  const user = await User.findOne(
+    { clerkId: userId },
+    { eventLog: { $slice: -1 } },
+  ).lean();
+  const latest = user?.eventLog.at(-1);
+  if (!latest) return null;
+
+  const lastRoundNum = Math.max(0, ...latest.roundLog.map((r) => r.roundNum));
+  return {
+    eventName: latest.eventName ?? "",
+    eventDateTime: latest.eventDateTime.toISOString(),
+    nextRoundNum: lastRoundNum + 1,
+  };
+}
+
+export async function listMyEvents(limit?: number): Promise<EventDTO[]> {
   await connection();
   const userId = await requireUserId();
   await connectDB();
@@ -98,5 +126,6 @@ export async function listMyEvents(): Promise<EventDTO[]> {
       })),
       lastUpdated: e.lastUpdated?.toISOString() ?? null,
     }))
-    .sort((a, b) => b.eventDateTime.localeCompare(a.eventDateTime));
+    .sort((a, b) => b.eventDateTime.localeCompare(a.eventDateTime))
+    .slice(0, limit);
 }
