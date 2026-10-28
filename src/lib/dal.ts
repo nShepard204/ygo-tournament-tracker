@@ -42,6 +42,8 @@ export async function ensureUserRecord(userId: string) {
 
 // Plain, serializable shapes safe to pass to Client Components.
 export type RoundDTO = {
+  // null for rounds stored without an _id; those can't be edited or deleted.
+  id: string | null;
   roundNum: number;
   tableNum: number | null;
   roundResult: boolean;
@@ -115,6 +117,7 @@ export async function listMyEvents(limit?: number): Promise<EventDTO[]> {
       deck: e.deck ?? "",
       eventNotes: e.eventNotes ?? "",
       roundLog: e.roundLog.map((r) => ({
+        id: r._id?.toString() ?? null,
         roundNum: r.roundNum,
         tableNum: r.tableNum ?? null,
         roundResult: r.roundResult,

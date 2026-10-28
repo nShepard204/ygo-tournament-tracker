@@ -14,8 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { LatestEventSummary } from "@/lib/dal";
-import { addRoundToLatestEvent, type AddRoundState } from "./actions";
+import type { LatestEventSummary, RoundDTO } from "@/lib/dal";
+import { addRoundToLatestEvent, type FormState } from "./actions";
 
 export function AddRoundDialog({
   trigger,
@@ -38,7 +38,8 @@ export function AddRoundDialog({
             {new Date(latestEvent.eventDateTime).toLocaleDateString()}
           </DialogDescription>
         </DialogHeader>
-        <AddRoundForm
+        <RoundForm
+          action={addRoundToLatestEvent}
           defaultRoundNum={latestEvent.nextRoundNum}
           onSuccess={() => setOpen(false)}
         />
@@ -47,17 +48,19 @@ export function AddRoundDialog({
   );
 }
 
-function AddRoundForm({
+// Shared by "Add round" and "Edit round". Pass `round` to prefill for editing.
+export function RoundForm({
+  action,
+  round,
   defaultRoundNum,
   onSuccess,
 }: {
-  defaultRoundNum: number;
+  action: (prev: FormState, formData: FormData) => Promise<FormState>;
+  round?: RoundDTO;
+  defaultRoundNum?: number;
   onSuccess: () => void;
 }) {
-  const [state, formAction, pending] = useActionState<AddRoundState, FormData>(
-    addRoundToLatestEvent,
-    {},
-  );
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, {});
 
   useEffect(() => {
     if (state.success) onSuccess();
@@ -73,7 +76,7 @@ function AddRoundForm({
             name="roundNum"
             type="number"
             min={1}
-            defaultValue={defaultRoundNum}
+            defaultValue={round?.roundNum ?? defaultRoundNum}
             required
             inputMode="numeric"
             pattern="[0-9]*"
@@ -87,6 +90,7 @@ function AddRoundForm({
             type="number"
             min={0}
             placeholder="—"
+            defaultValue={round?.tableNum ?? undefined}
             inputMode="numeric"
             pattern="[0-9]*"
           />
@@ -100,6 +104,7 @@ function AddRoundForm({
           Icon={Trophy}
           yes={{ value: "win", label: "Won the round" }}
           no={{ value: "loss", label: "Lost the round" }}
+          defaultValue={round ? (round.roundResult ? "win" : "loss") : undefined}
         />
         <YesNoCard
           name="dieRollResult"
@@ -108,11 +113,12 @@ function AddRoundForm({
           Icon={Dice6}
           yes={{ value: "won", label: "Won the die roll" }}
           no={{ value: "lost", label: "Lost the die roll" }}
+          defaultValue={round ? (round.dieRollResult ? "won" : "lost") : undefined}
         />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="opponentsName">Opponent</Label>
-        <Input id="opponentsName" name="opponentsName" placeholder="Name" />
+        <Input id="opponentsName" name="opponentsName" placeholder="Name" defaultValue={round?.opponentsName} />
       </div>
       <div className="grid grid-cols-[1fr_6rem] gap-4">
         <div className="grid gap-2">
@@ -121,6 +127,7 @@ function AddRoundForm({
             id="opponentsDeck"
             name="opponentsDeck"
             placeholder="Branded"
+            defaultValue={round?.opponentsDeck}
           />
         </div>
         <div className="grid gap-2">
@@ -131,7 +138,7 @@ function AddRoundForm({
             type="number"
             min={40}
             max={60}
-            defaultValue={40}
+            defaultValue={round?.opponentsDeckSize ?? 40}
             inputMode="numeric"
             pattern="[0-9]*"
           />
@@ -139,11 +146,11 @@ function AddRoundForm({
       </div>
       <div className="grid gap-2">
         <Label htmlFor="roundNotes">Notes</Label>
-        <Textarea id="roundNotes" name="roundNotes" rows={3} />
+        <Textarea id="roundNotes" name="roundNotes" rows={3} defaultValue={round?.roundNotes} />
       </div>
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
       <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Add round"}
+        {pending ? "Saving…" : round ? "Save round" : "Add round"}
       </Button>
     </form>
   );
@@ -161,6 +168,7 @@ function YesNoCard({
   Icon,
   yes,
   no,
+  defaultValue,
 }: {
   name: string;
   legend: string;
@@ -168,6 +176,7 @@ function YesNoCard({
   Icon: LucideIcon;
   yes: YesNoOption;
   no: YesNoOption;
+  defaultValue?: string;
 }) {
   const options = [
     { ...yes, OptionIcon: Check, checkedClass: "has-checked:border-green-600 has-checked:bg-green-600 has-checked:text-white" },
@@ -188,7 +197,14 @@ function YesNoCard({
             title={label}
             className={`flex size-10 cursor-pointer items-center justify-center rounded-full border-2 border-input text-muted-foreground transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 ${checkedClass}`}
           >
-            <input type="radio" name={name} value={value} aria-label={label} className="sr-only" />
+            <input
+              type="radio"
+              name={name}
+              value={value}
+              defaultChecked={value === defaultValue}
+              aria-label={label}
+              className="sr-only"
+            />
             <OptionIcon className="size-5" strokeWidth={2.5} />
           </label>
         ))}
