@@ -3,7 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { connectDB } from "@/lib/db";
 import { User } from "@/models/User";
-import { Tournament } from "@/models/Tournament";
+import { connection } from "next/server";
 
 // Data Access Layer: every read/write goes through here so authorization
 // lives in one place. Proxy redirects are only an optimistic first check.
@@ -30,37 +30,73 @@ export async function ensureUserRecord(userId: string) {
       $setOnInsert: {
         clerkId: userId,
         email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
-        username: clerkUser.username ?? undefined,
-        displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || undefined,
-        imageUrl: clerkUser.imageUrl,
+        name: [clerkUser.firstName, clerkUser.lastName]
+          .filter(Boolean)
+          .join(" "),
+        eventLog: [],
       },
     },
     { upsert: true },
   );
 }
 
-// Plain, serializable shape safe to pass to Client Components.
-export type TournamentDTO = {
-  id: string;
-  name: string;
-  format: string;
-  date: string;
-  location: string | null;
-  status: string;
+// Plain, serializable shapes safe to pass to Client Components.
+export type RoundDTO = {
+  roundNum: number;
+  tableNum: number | null;
+  roundResult: boolean;
+  dieRollResult: boolean;
+  opponentsName: string;
+  opponentsDeck: string;
+  opponentsDeckSize: number;
+  roundNotes: string;
 };
 
-export async function listMyTournaments(): Promise<TournamentDTO[]> {
+export type EventDTO = {
+  id: string;
+  eventName: string;
+  eventLocation: string;
+  eventDateTime: string;
+  playerCount: number;
+  eventFormat: string;
+  isPremierEvent: boolean;
+  deck: string;
+  eventNotes: string;
+  roundLog: RoundDTO[];
+  lastUpdated: string | null;
+};
+
+export async function listMyEvents(): Promise<EventDTO[]> {
+  await connection();
   const userId = await requireUserId();
   await connectDB();
 
-  const docs = await Tournament.find({ ownerId: userId }).sort({ date: -1 }).limit(50).lean();
+  const user = await User.findOne({ clerkId: userId }, { eventLog: 1 }).lean();
+  if (!user) return [];
 
-  return docs.map((t) => ({
-    id: t._id.toString(),
-    name: t.name,
-    format: t.format,
-    date: t.date.toISOString(),
-    location: t.location ?? null,
-    status: t.status ?? "upcoming",
-  }));
+  return user.eventLog
+    .map((e, i) => ({
+      // Older documents may have events without an _id; fall back to position.
+      id: e._id?.toString() ?? `idx-${i}`,
+      eventName: e.eventName ?? "",
+      eventLocation: e.eventLocation ?? "",
+      eventDateTime: e.eventDateTime.toISOString(),
+      playerCount: e.playerCount ?? 0,
+      eventFormat: e.eventFormat,
+      isPremierEvent: e.isPremierEvent ?? false,
+      deck: e.deck ?? "",
+      eventNotes: e.eventNotes ?? "",
+      roundLog: e.roundLog.map((r) => ({
+        roundNum: r.roundNum,
+        tableNum: r.tableNum ?? null,
+        roundResult: r.roundResult,
+        dieRollResult: r.dieRollResult ?? false,
+        opponentsName: r.opponentsName ?? "",
+        opponentsDeck: r.opponentsDeck ?? "",
+        opponentsDeckSize: r.opponentsDeckSize ?? 40,
+        roundNotes: r.roundNotes ?? "",
+      })),
+      lastUpdated: e.lastUpdated?.toISOString() ?? null,
+    }))
+    .sort((a, b) => b.eventDateTime.localeCompare(a.eventDateTime));
 }
