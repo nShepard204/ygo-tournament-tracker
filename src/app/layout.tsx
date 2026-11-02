@@ -6,6 +6,7 @@ import { ClerkProvider, Show, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
 import Script from "next/script";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/toast";
 import { UserMenu } from "@/components/user-menu";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -70,6 +71,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Suspense>
           </header>
           {children}
+          {/* Confirms saves and deletes to the user's data; shown on mobile only */}
+          <Toaster timeout={3000} viewportClassName="md:hidden" />
         </body>
       </html>
     </ClerkProvider>

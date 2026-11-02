@@ -6,3 +6,5 @@ export const EVENT_FORMATS = [
   "GOAT",
   "Other",
 ] as const;
+
+export const DECK_SIZE_MESSAGE = "Deck size must be a whole number from 40 to 60";

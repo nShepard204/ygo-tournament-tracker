@@ -5,13 +5,14 @@ import { isValidObjectId, Types } from "mongoose";
 import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import { ensureUserRecord, requireUserId } from "@/lib/dal";
-import { EVENT_FORMATS } from "@/lib/constants";
+import { DECK_SIZE_MESSAGE, EVENT_FORMATS } from "@/lib/constants";
 import { User } from "@/models/User";
 
 // Every action here is a public POST endpoint: each one re-checks auth and only
 // touches the signed-in user's own document (filtered by clerkId).
 
-export type FormState = { error?: string; success?: boolean };
+// `message` confirms a successful change to the user (shown as a toast).
+export type FormState = { error?: string; success?: boolean; message?: string };
 export type CreateEventState = FormState;
 export type AddRoundState = FormState;
 
@@ -27,22 +28,25 @@ const EventSchema = z.object({
 });
 
 const RoundSchema = z.object({
-  roundNum: z.coerce.number().int().min(1, "Round must be 1 or higher"),
+  // Blank means "next round" when adding and "unchanged" when editing.
+  roundNum: z.coerce.number().int().min(1, "Round must be 1 or higher").optional(),
   tableNum: z.coerce.number().int().min(0).optional(),
   roundResult: z
-    .enum(["win", "loss"], { error: "Pick whether you won the round" })
-    .transform((v) => v === "win"),
+    .enum(["win", "loss"])
+    .transform((v) => v === "win")
+    .optional(),
   dieRollResult: z
-    .enum(["won", "lost"], { error: "Pick whether you won the die roll" })
-    .transform((v) => v === "won"),
+    .enum(["won", "lost"])
+    .transform((v) => v === "won")
+    .optional(),
   opponentsName: z.string().trim().max(120).default(""),
   opponentsDeck: z.string().trim().max(120).default(""),
   opponentsDeckSize: z.coerce
     .number()
-    .int()
-    .min(40, "Decks are 40–60 cards")
-    .max(60, "Decks are 40–60 cards")
-    .default(40),
+    .int(DECK_SIZE_MESSAGE)
+    .min(40, DECK_SIZE_MESSAGE)
+    .max(60, DECK_SIZE_MESSAGE)
+    .optional(),
   roundNotes: z.string().max(2000).default(""),
 });
 
@@ -61,10 +65,10 @@ function parseEvent(formData: FormData) {
 
 function parseRound(formData: FormData) {
   return RoundSchema.safeParse({
-    roundNum: formData.get("roundNum"),
+    roundNum: formData.get("roundNum") || undefined,
     tableNum: formData.get("tableNum") || undefined,
-    roundResult: formData.get("roundResult"),
-    dieRollResult: formData.get("dieRollResult"),
+    roundResult: formData.get("roundResult") || undefined,
+    dieRollResult: formData.get("dieRollResult") || undefined,
     opponentsName: formData.get("opponentsName") ?? undefined,
     opponentsDeck: formData.get("opponentsDeck") ?? undefined,
     opponentsDeckSize: formData.get("opponentsDeckSize") || undefined,
@@ -99,7 +103,7 @@ export async function createEvent(_prev: FormState, formData: FormData): Promise
   );
 
   revalidateEvents();
-  return { success: true };
+  return { success: true, message: "Event created" };
 }
 
 export async function updateEvent(
@@ -122,7 +126,7 @@ export async function updateEvent(
   if (res.matchedCount === 0) return { error: "Event not found." };
 
   revalidateEvents();
-  return { success: true };
+  return { success: true, message: "Event updated" };
 }
 
 export async function deleteEvent(eventId: string): Promise<FormState> {
@@ -135,7 +139,7 @@ export async function deleteEvent(eventId: string): Promise<FormState> {
   if (res.modifiedCount === 0) return { error: "Event not found." };
 
   revalidateEvents();
-  return { success: true };
+  return { success: true, message: "Event deleted" };
 }
 
 // Adds a round to the most recently created event (the last entry in eventLog).
@@ -152,15 +156,18 @@ export async function addRoundToLatestEvent(
   const latest = user?.eventLog.at(-1);
   if (!latest) return { error: "Create an event before adding rounds." };
 
-  if (latest.roundLog.some((r) => r.roundNum === parsed.data.roundNum)) {
-    return { error: `Round ${parsed.data.roundNum} is already logged for this event.` };
+  const roundNum =
+    parsed.data.roundNum ?? Math.max(0, ...latest.roundLog.map((r) => r.roundNum)) + 1;
+  if (latest.roundLog.some((r) => r.roundNum === roundNum)) {
+    return { error: `Round ${roundNum} is already logged for this event.` };
   }
 
+  const newRound = { ...parsed.data, roundNum };
   const now = new Date();
   if (latest._id) {
     await User.updateOne(
       { clerkId: userId, "eventLog._id": latest._id },
-      { $push: { "eventLog.$.roundLog": parsed.data }, $set: { "eventLog.$.lastUpdated": now } },
+      { $push: { "eventLog.$.roundLog": newRound }, $set: { "eventLog.$.lastUpdated": now } },
     );
   } else {
     // Older events were stored without an _id; address the last one by position.
@@ -171,12 +178,12 @@ export async function addRoundToLatestEvent(
     const path = `eventLog.${count - 1}`;
     await User.updateOne(
       { clerkId: userId },
-      { $push: { [`${path}.roundLog`]: parsed.data }, $set: { [`${path}.lastUpdated`]: now } },
+      { $push: { [`${path}.roundLog`]: newRound }, $set: { [`${path}.lastUpdated`]: now } },
     );
   }
 
   revalidateEvents();
-  return { success: true };
+  return { success: true, message: `Round ${roundNum} added` };
 }
 
 export async function updateRound(
@@ -200,30 +207,45 @@ export async function updateRound(
   ).lean();
   const event = user?.eventLog[0];
   if (!event) return { error: "Event not found." };
-  if (!event.roundLog.some((r) => r._id?.equals(rid))) return { error: "Round not found." };
+  const existing = event.roundLog.find((r) => r._id?.equals(rid));
+  if (!existing) return { error: "Round not found." };
 
-  const clash = event.roundLog.some(
-    (r) => r.roundNum === parsed.data.roundNum && !r._id?.equals(rid),
+  const { roundNum, tableNum, roundResult, dieRollResult, opponentsDeckSize, ...rest } =
+    parsed.data;
+  const roundNumConflict =
+    roundNum !== undefined &&
+    event.roundLog.some((r) => r.roundNum === roundNum && !r._id?.equals(rid));
+  if (roundNumConflict) return { error: `Round ${roundNum} is already logged for this event.` };
+
+  // A blank Round field keeps the current number; other blank optional fields
+  // clear any previous value.
+  const optional = { tableNum, roundResult, dieRollResult, opponentsDeckSize };
+  const toSet = Object.fromEntries(Object.entries(optional).filter(([, v]) => v !== undefined));
+  const toUnset = Object.fromEntries(
+    Object.entries(optional)
+      .filter(([, v]) => v === undefined)
+      .map(([k]) => [k, ""]),
   );
-  if (clash) return { error: `Round ${parsed.data.roundNum} is already logged for this event.` };
-
-  // A blank Table field clears any previous table number.
-  const { tableNum, ...rest } = parsed.data;
   await User.updateOne(
     { clerkId: userId },
     {
       $set: {
-        ...setPaths("eventLog.$[e].roundLog.$[r]", rest),
+        ...setPaths("eventLog.$[e].roundLog.$[r]", {
+          ...rest,
+          ...toSet,
+          ...(roundNum !== undefined && { roundNum }),
+        }),
         "eventLog.$[e].lastUpdated": new Date(),
-        ...(tableNum !== undefined && { "eventLog.$[e].roundLog.$[r].tableNum": tableNum }),
       },
-      ...(tableNum === undefined && { $unset: { "eventLog.$[e].roundLog.$[r].tableNum": "" } }),
+      ...(Object.keys(toUnset).length > 0 && {
+        $unset: setPaths("eventLog.$[e].roundLog.$[r]", toUnset),
+      }),
     },
     { arrayFilters: [{ "e._id": eid }, { "r._id": rid }] },
   );
 
   revalidateEvents();
-  return { success: true };
+  return { success: true, message: `Round ${roundNum ?? existing.roundNum} updated` };
 }
 
 export async function deleteRound(eventId: string, roundId: string): Promise<FormState> {
@@ -243,5 +265,5 @@ export async function deleteRound(eventId: string, roundId: string): Promise<For
   if (res.matchedCount === 0) return { error: "Round not found." };
 
   revalidateEvents();
-  return { success: true };
+  return { success: true, message: "Round deleted" };
 }

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 import { EVENT_FORMATS } from "@/lib/constants";
 import type { EventDTO } from "@/lib/dal";
 import { createEvent, updateEvent, type FormState } from "./actions";
@@ -26,6 +27,11 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
     if (!event) formRef.current?.reset();
     onSuccess?.();
   }, [state, onSuccess, event]);
+
+  // Keyed on `state` alone so it fires once per save, not on every re-render.
+  useEffect(() => {
+    if (state.message) toast.add({ title: state.message, type: "success" });
+  }, [state]);
 
   // datetime-local values carry no time zone. Convert in the browser, which knows
   // the user's zone, so the server stores the right instant wherever it runs.

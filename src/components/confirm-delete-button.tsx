@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/toast";
 
 // Opens a confirmation dialog; `onConfirm` only runs once the user confirms.
 // The dialog stays open and shows the error if the delete fails.
@@ -24,7 +25,7 @@ export function ConfirmDeleteButton({
   trigger: ReactElement;
   title: string;
   description: ReactNode;
-  onConfirm: () => Promise<{ error?: string }>;
+  onConfirm: () => Promise<{ error?: string; message?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +34,9 @@ export function ConfirmDeleteButton({
   const confirm = () =>
     startTransition(async () => {
       const result = await onConfirm();
-      if (result.error) setError(result.error);
-      else setOpen(false);
+      if (result.error) return setError(result.error);
+      setOpen(false);
+      if (result.message) toast.add({ title: result.message, type: "delete" });
     });
 
   return (

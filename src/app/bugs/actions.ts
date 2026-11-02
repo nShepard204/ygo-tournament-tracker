@@ -2,12 +2,7 @@
 
 import { z } from "zod";
 import { requireUserId } from "@/lib/dal";
-
-// Fine-grained GitHub token with "Issues: Read and write" on this repo only.
-// Server-side only: never prefix with NEXT_PUBLIC_.
-const GITHUB_TOKEN = process.env.GITHUB_BUG_REPORT_TKN;
-const GITHUB_REPO =
-  process.env.GITHUB_REPO ?? "nShepard204/ygo-tournament-tracker";
+import { createGithubIssue, inAppIssueFooter } from "@/lib/github";
 
 const BugReportSchema = z.object({
   title: z
@@ -45,43 +40,20 @@ export async function reportBug(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  if (!GITHUB_TOKEN) {
-    console.error("reportBug: GITHUB_TOKEN is not set");
+  const { title, description, page } = parsed.data;
+  const issue = await createGithubIssue({
+    title: `[Bug] ${title}`,
+    body: `${description}\n\n${inAppIssueFooter(userId, page)}`,
+    labels: ["bug"],
+  });
+
+  if (!issue.ok) {
     return {
-      error: "Bug reporting isn't configured yet. Please try again later.",
+      error:
+        issue.reason === "not-configured"
+          ? "Bug reporting isn't configured yet. Please try again later."
+          : "Couldn't submit the report. Please try again.",
     };
   }
-
-  const { title, description, page } = parsed.data;
-  const body = [
-    description,
-    "",
-    "---",
-    `Reported in-app by Clerk user \`${userId}\``,
-    page ? `Page: \`${page}\`` : null,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
-
-  const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO}/issues`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title: `[Bug] ${title}`, body, labels: ["bug"] }),
-    },
-  );
-
-  if (!res.ok) {
-    console.error("reportBug: GitHub API error", res.status, await res.text());
-    return { error: "Couldn't submit the report. Please try again." };
-  }
-
-  const issue = (await res.json()) as { html_url: string; number: number };
-  return { issueUrl: issue.html_url, issueNumber: issue.number };
+  return { issueUrl: issue.url, issueNumber: issue.number };
 }

@@ -15,11 +15,12 @@ import { EVENT_FORMATS } from "@/lib/constants";
 const RoundSchema = new Schema({
   roundNum: { type: Number, required: true, min: 1 },
   tableNum: { type: Number, min: 0 },
-  roundResult: { type: Boolean, required: true }, // true = win
-  dieRollResult: { type: Boolean, default: false }, // true = won the die roll
+  // Both unset until the player records them, so a round can be logged early.
+  roundResult: { type: Boolean }, // true = win
+  dieRollResult: { type: Boolean }, // true = won the die roll
   opponentsName: { type: String, trim: true, default: "" },
   opponentsDeck: { type: String, trim: true, default: "" },
-  opponentsDeckSize: { type: Number, min: 40, max: 60, default: 40 },
+  opponentsDeckSize: { type: Number, min: 40, max: 60 }, // unset when unknown
   roundNotes: { type: String, default: "" },
 });
 

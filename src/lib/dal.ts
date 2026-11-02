@@ -2,7 +2,8 @@ import "server-only";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { connectDB } from "@/lib/db";
-import { User } from "@/models/User";
+import { User, type UserDoc } from "@/models/User";
+import type { Types } from "mongoose";
 import { connection } from "next/server";
 
 // Data Access Layer: every read/write goes through here so authorization
@@ -46,11 +47,12 @@ export type RoundDTO = {
   id: string | null;
   roundNum: number;
   tableNum: number | null;
-  roundResult: boolean;
-  dieRollResult: boolean;
+  // null until recorded.
+  roundResult: boolean | null;
+  dieRollResult: boolean | null;
   opponentsName: string;
   opponentsDeck: string;
-  opponentsDeckSize: number;
+  opponentsDeckSize: number | null;
   roundNotes: string;
 };
 
@@ -69,10 +71,31 @@ export type EventDTO = {
 };
 
 export type LatestEventSummary = {
+  // null for events stored without an _id; their rounds can't be edited.
+  eventId: string | null;
   eventName: string;
   eventDateTime: string;
   nextRoundNum: number;
+  // The round most recently added to this event, if any.
+  lastRound: RoundDTO | null;
 };
+
+// Lean query results include each subdocument's _id, which the inferred type omits.
+type StoredRound = UserDoc["eventLog"][number]["roundLog"][number] & { _id?: Types.ObjectId };
+
+function toRoundDTO(r: StoredRound): RoundDTO {
+  return {
+    id: r._id?.toString() ?? null,
+    roundNum: r.roundNum,
+    tableNum: r.tableNum ?? null,
+    roundResult: r.roundResult ?? null,
+    dieRollResult: r.dieRollResult ?? null,
+    opponentsName: r.opponentsName ?? "",
+    opponentsDeck: r.opponentsDeck ?? "",
+    opponentsDeckSize: r.opponentsDeckSize ?? null,
+    roundNotes: r.roundNotes ?? "",
+  };
+}
 
 // The most recently *created* event (last pushed onto eventLog), which is not
 // necessarily the one with the latest date.
@@ -89,10 +112,14 @@ export async function getLatestCreatedEvent(): Promise<LatestEventSummary | null
   if (!latest) return null;
 
   const lastRoundNum = Math.max(0, ...latest.roundLog.map((r) => r.roundNum));
+  // Rounds are pushed onto roundLog, so the last entry is the newest one.
+  const lastRound = latest.roundLog.at(-1);
   return {
+    eventId: latest._id?.toString() ?? null,
     eventName: latest.eventName ?? "",
     eventDateTime: latest.eventDateTime.toISOString(),
     nextRoundNum: lastRoundNum + 1,
+    lastRound: lastRound ? toRoundDTO(lastRound) : null,
   };
 }
 
@@ -116,17 +143,7 @@ export async function listMyEvents(limit?: number): Promise<EventDTO[]> {
       isPremierEvent: e.isPremierEvent ?? false,
       deck: e.deck ?? "",
       eventNotes: e.eventNotes ?? "",
-      roundLog: e.roundLog.map((r) => ({
-        id: r._id?.toString() ?? null,
-        roundNum: r.roundNum,
-        tableNum: r.tableNum ?? null,
-        roundResult: r.roundResult,
-        dieRollResult: r.dieRollResult ?? false,
-        opponentsName: r.opponentsName ?? "",
-        opponentsDeck: r.opponentsDeck ?? "",
-        opponentsDeckSize: r.opponentsDeckSize ?? 40,
-        roundNotes: r.roundNotes ?? "",
-      })),
+      roundLog: e.roundLog.map(toRoundDTO),
       lastUpdated: e.lastUpdated?.toISOString() ?? null,
     }))
     .sort((a, b) => b.eventDateTime.localeCompare(a.eventDateTime))

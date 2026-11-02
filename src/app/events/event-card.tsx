@@ -46,8 +46,8 @@ const EVENT_TIME_FORMAT: Intl.DateTimeFormatOptions = {
 
 // The card summarizes the event; tapping it opens a popup with every round.
 export function EventCard({ event: e }: { event: EventDTO }) {
-  const wins = e.roundLog.filter((r) => r.roundResult).length;
-  const losses = e.roundLog.length - wins;
+  const wins = e.roundLog.filter((r) => r.roundResult === true).length;
+  const losses = e.roundLog.filter((r) => r.roundResult === false).length;
   const rounds = [...e.roundLog].sort((a, b) => a.roundNum - b.roundNum);
   // Legacy events stored without an _id get a positional id and can't be modified.
   const canModify = !e.id.startsWith("idx-");
@@ -170,9 +170,9 @@ function RoundItem({
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-16 shrink-0">Round {r.roundNum}</span>
           <span
-            className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold text-white ${r.roundResult ? "bg-green-600" : "bg-red-600"}`}
+            className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${r.roundResult == null ? "bg-muted text-muted-foreground" : r.roundResult ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}
           >
-            {r.roundResult ? "W" : "L"}
+            {r.roundResult == null ? "–" : r.roundResult ? "W" : "L"}
           </span>
           <span className="truncate font-normal text-muted-foreground">
             vs {r.opponentsName || "Unknown"}
@@ -181,12 +181,12 @@ function RoundItem({
       </AccordionTrigger>
       <AccordionContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg bg-muted/40 p-3">
-          <Detail label="Result" value={r.roundResult ? "Won" : "Lost"} />
-          <Detail label="Die roll" value={r.dieRollResult ? "Won" : "Lost"} />
+          <Detail label="Result" value={wonLost(r.roundResult)} />
+          <Detail label="Die roll" value={wonLost(r.dieRollResult)} />
           <Detail label="Table" value={r.tableNum ?? "—"} />
           <Detail label="Opponent" value={r.opponentsName || "—"} />
           <Detail label="Their deck" value={r.opponentsDeck || "—"} />
-          <Detail label="Deck size" value={r.opponentsDeckSize} />
+          <Detail label="Deck size" value={r.opponentsDeckSize ?? "—"} />
           {r.roundNotes && <Detail label="Notes" value={r.roundNotes} />}
         </dl>
         {eventId && roundId && (
@@ -212,6 +212,11 @@ function RoundItem({
       </AccordionContent>
     </AccordionItem>
   );
+}
+
+function wonLost(value: boolean | null) {
+  if (value == null) return "—";
+  return value ? "Won" : "Lost";
 }
 
 function Detail({ label, value }: { label: string; value: string | number }) {
