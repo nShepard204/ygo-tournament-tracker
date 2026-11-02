@@ -181,7 +181,7 @@ function RoundItem({
       </AccordionTrigger>
       <AccordionContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg bg-muted/40 p-3">
-          <Detail label="Result" value={r.roundResult ? "Win" : "Loss"} />
+          <Detail label="Result" value={r.roundResult ? "Won" : "Lost"} />
           <Detail label="Die roll" value={r.dieRollResult ? "Won" : "Lost"} />
           <Detail label="Table" value={r.tableNum ?? "—"} />
           <Detail label="Opponent" value={r.opponentsName || "—"} />
