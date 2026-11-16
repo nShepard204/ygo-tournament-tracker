@@ -18,6 +18,12 @@ const RoundSchema = new Schema({
   // Both unset until the player records them, so a round can be logged early.
   roundResult: { type: Boolean }, // true = win
   dieRollResult: { type: Boolean }, // true = won the die roll
+  // Per-game results in a best-of-three; true = win, null = not recorded.
+  gameResults: {
+    game1Result: { type: Boolean, default: null },
+    game2Result: { type: Boolean, default: null },
+    game3Result: { type: Boolean, default: null },
+  },
   opponentsName: { type: String, trim: true, default: "" },
   opponentsDeck: { type: String, trim: true, default: "" },
   opponentsDeckSize: { type: Number, min: 40, max: 60 }, // unset when unknown

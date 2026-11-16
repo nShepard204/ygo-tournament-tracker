@@ -27,6 +27,19 @@ const EventSchema = z.object({
   eventNotes: z.string().max(2000).default(""),
 });
 
+// Blank = not recorded (null), so a game can be left open and filled in later.
+const gameResult = z
+  .enum(["win", "loss"])
+  .optional()
+  .transform((v) => (v === undefined ? null : v === "win"));
+
+const GameResultsSchema = z
+  .object({ game1Result: gameResult, game2Result: gameResult, game3Result: gameResult })
+  // Game 3 isn't played once one player has taken the first two games.
+  .transform((g) =>
+    g.game1Result !== null && g.game1Result === g.game2Result ? { ...g, game3Result: null } : g,
+  );
+
 const RoundSchema = z.object({
   // Blank means "next round" when adding and "unchanged" when editing.
   roundNum: z.coerce.number().int().min(1, "Round must be 1 or higher").optional(),
@@ -39,6 +52,7 @@ const RoundSchema = z.object({
     .enum(["won", "lost"])
     .transform((v) => v === "won")
     .optional(),
+  gameResults: GameResultsSchema,
   opponentsName: z.string().trim().max(120).default(""),
   opponentsDeck: z.string().trim().max(120).default(""),
   opponentsDeckSize: z.coerce
@@ -69,6 +83,11 @@ function parseRound(formData: FormData) {
     tableNum: formData.get("tableNum") || undefined,
     roundResult: formData.get("roundResult") || undefined,
     dieRollResult: formData.get("dieRollResult") || undefined,
+    gameResults: {
+      game1Result: formData.get("game1Result") || undefined,
+      game2Result: formData.get("game2Result") || undefined,
+      game3Result: formData.get("game3Result") || undefined,
+    },
     opponentsName: formData.get("opponentsName") ?? undefined,
     opponentsDeck: formData.get("opponentsDeck") ?? undefined,
     opponentsDeckSize: formData.get("opponentsDeckSize") || undefined,

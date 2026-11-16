@@ -50,10 +50,18 @@ export type RoundDTO = {
   // null until recorded.
   roundResult: boolean | null;
   dieRollResult: boolean | null;
+  gameResults: GameResults;
   opponentsName: string;
   opponentsDeck: string;
   opponentsDeckSize: number | null;
   roundNotes: string;
+};
+
+// true = won that game, null = not recorded.
+export type GameResults = {
+  game1Result: boolean | null;
+  game2Result: boolean | null;
+  game3Result: boolean | null;
 };
 
 export type EventDTO = {
@@ -90,6 +98,12 @@ function toRoundDTO(r: StoredRound): RoundDTO {
     tableNum: r.tableNum ?? null,
     roundResult: r.roundResult ?? null,
     dieRollResult: r.dieRollResult ?? null,
+    // Rounds saved before game tracking have no gameResults at all.
+    gameResults: {
+      game1Result: r.gameResults?.game1Result ?? null,
+      game2Result: r.gameResults?.game2Result ?? null,
+      game3Result: r.gameResults?.game3Result ?? null,
+    },
     opponentsName: r.opponentsName ?? "",
     opponentsDeck: r.opponentsDeck ?? "",
     opponentsDeckSize: r.opponentsDeckSize ?? null,

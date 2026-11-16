@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { LocalDateTime } from "@/components/local-date-time";
@@ -182,6 +182,7 @@ function RoundItem({
       <AccordionContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg bg-muted/40 p-3">
           <Detail label="Result" value={wonLost(r.roundResult)} />
+          <Detail label="Games" value={<GameResultBadges games={r.gameResults} />} />
           <Detail label="Die roll" value={wonLost(r.dieRollResult)} />
           <Detail label="Table" value={r.tableNum ?? "—"} />
           <Detail label="Opponent" value={r.opponentsName || "—"} />
@@ -219,7 +220,32 @@ function wonLost(value: boolean | null) {
   return value ? "Won" : "Lost";
 }
 
-function Detail({ label, value }: { label: string; value: string | number }) {
+// One W/L badge per game, e.g. "G1 W · G2 L · G3 W". Unrecorded games show "–";
+// game 3 is left out when the first two games went the same way.
+function GameResultBadges({ games }: { games: RoundDTO["gameResults"] }) {
+  const results = [games.game1Result, games.game2Result, games.game3Result];
+  if (results.every((g) => g === null)) return "—";
+  const decidedInTwo = games.game1Result !== null && games.game1Result === games.game2Result;
+  const shown = decidedInTwo ? results.slice(0, 2) : results;
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {shown.map((g, i) => (
+        <span key={i} className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">G{i + 1}</span>
+          <span
+            className={`rounded px-1.5 py-0.5 text-xs font-semibold ${g == null ? "bg-muted text-muted-foreground" : g ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}
+            aria-label={`Game ${i + 1}: ${g == null ? "not recorded" : g ? "won" : "lost"}`}
+          >
+            {g == null ? "–" : g ? "W" : "L"}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>

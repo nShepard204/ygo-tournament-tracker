@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { DECK_SIZE_MESSAGE } from "@/lib/constants";
-import type { LatestEventSummary, RoundDTO } from "@/lib/dal";
+import type { GameResults, LatestEventSummary, RoundDTO } from "@/lib/dal";
 import { addRoundToLatestEvent, updateRound, type FormState } from "./actions";
 
 export function AddRoundDialog({
@@ -104,6 +104,29 @@ export function RoundForm({
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, {});
   const [deckSizeError, setDeckSizeError] = useState<string>();
+  const [roundResult, setRoundResult] = useState(
+    yesNoDefault(round?.roundResult, "win", "loss"),
+  );
+  const [games, setGames] = useState<GameResults>(
+    round?.gameResults ?? { game1Result: null, game2Result: null, game3Result: null },
+  );
+
+  // Game 3 isn't played once the first two games went the same way.
+  const game3Disabled = games.game1Result !== null && games.game1Result === games.game2Result;
+
+  function setGame(key: keyof GameResults, value: boolean | null) {
+    const gamesObj = { ...games, [key]: value };
+    // A game 3 picked earlier is dropped once the first two games decide the round.
+    if (gamesObj.game1Result !== null && gamesObj.game1Result === gamesObj.game2Result) {
+      gamesObj.game3Result = null;
+    }
+    setGames(gamesObj);
+    // Two games with the same result decide the round; otherwise leave the
+    // round result as the player set it.
+    const played = [gamesObj.game1Result, gamesObj.game2Result, gamesObj.game3Result];
+    if (played.filter((g) => g === true).length >= 2) setRoundResult("win");
+    else if (played.filter((g) => g === false).length >= 2) setRoundResult("loss");
+  }
 
   useEffect(() => {
     if (state.success) onSuccess();
@@ -202,12 +225,29 @@ export function RoundForm({
         </div>
       </FormSection>
       <FormSection title="Post-round info">
+        <div className="grid gap-2">
+          {([1, 2, 3] as const).map((n) => {
+            const key = `game${n}Result` as const;
+            const disabled = n === 3 && game3Disabled;
+            return (
+              <GameResultRow
+                key={key}
+                name={key}
+                gameNum={n}
+                value={games[key]}
+                disabled={disabled}
+                onChange={(v) => setGame(key, v)}
+              />
+            );
+          })}
+        </div>
         <YesNoCard
           name="roundResult"
           label="Won the round?"
           yes={{ value: "win", label: "Won the round" }}
           no={{ value: "loss", label: "Lost the round" }}
-          defaultValue={yesNoDefault(round?.roundResult, "win", "loss")}
+          value={roundResult}
+          onValueChange={setRoundResult}
         />
         <div className="grid gap-2">
           <Label htmlFor="roundNotes">Notes</Label>
@@ -233,7 +273,7 @@ function deckSizeErrorFor(input: HTMLInputElement) {
 function FormSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="grid gap-4">
-      <h3 className="border-b pb-1 text-sm font-semibold text-muted-foreground">{title}</h3>
+      <h3 className="border-b pb-1 text-base font-semibold text-muted-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -246,57 +286,143 @@ function yesNoDefault(value: boolean | null | undefined, yes: string, no: string
 
 type YesNoOption = { value: string; label: string };
 
+const YES_CHECKED_CLASS =
+  "has-checked:border-green-600 has-checked:bg-green-600/25 has-checked:text-green-700 dark:has-checked:text-green-400";
+const NO_CHECKED_CLASS =
+  "has-checked:border-red-600 has-checked:bg-red-600/25 has-checked:text-red-700 dark:has-checked:text-red-400";
+
 // A labeled radio pair: a green check and a red X, each half the width.
 // Clicking the picked option again unpicks it; leaving both unpicked saves the
-// round with no answer.
+// round with no answer. Pass `value` + `onValueChange` to control it.
 function YesNoCard({
   name,
   label,
   yes,
   no,
   defaultValue,
+  value,
+  onValueChange,
 }: {
   name: string;
   label: string;
   yes: YesNoOption;
   no: YesNoOption;
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string | undefined) => void;
 }) {
-  const [selected, setSelected] = useState(defaultValue);
-  const options = [
-    { ...yes, OptionIcon: Check, checkedClass: "has-checked:border-green-600 has-checked:bg-green-600/25 has-checked:text-green-700 dark:has-checked:text-green-400" },
-    { ...no, OptionIcon: X, checkedClass: "has-checked:border-red-600 has-checked:bg-red-600/25 has-checked:text-red-700 dark:has-checked:text-red-400" },
-  ];
+  const [internal, setInternal] = useState(defaultValue);
+  const controlled = onValueChange !== undefined;
+  const selected = controlled ? value : internal;
+  const setSelected = controlled ? onValueChange : setInternal;
 
   return (
     <fieldset className="min-w-0">
       <legend className="mb-2 text-sm leading-none font-medium select-none">{label}</legend>
       <div className="grid grid-cols-2 gap-3">
-        {options.map(({ value, label: optionLabel, OptionIcon, checkedClass }) => (
-          <label
-            key={value}
-            title={optionLabel}
-            className={`flex h-12 cursor-pointer items-center justify-center rounded-lg border-2 border-input text-muted-foreground transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 ${checkedClass}`}
-          >
-            <input
-              type="radio"
-              name={name}
-              value={value}
-              checked={value === selected}
-              onChange={() => setSelected(value)}
-              // A checked radio fires no change event when clicked again, so
-              // clear it here. `selected` is still the pre-click value, so picking
-              // a new option isn't undone.
-              onClick={() => {
-                if (value === selected) setSelected(undefined);
-              }}
-              aria-label={optionLabel}
-              className="sr-only"
-            />
-            <OptionIcon className="size-6" strokeWidth={2.5} />
-          </label>
-        ))}
+        <YesNoButtons
+          name={name}
+          yes={yes}
+          no={no}
+          selected={selected}
+          onSelect={setSelected}
+          className="h-12"
+          iconClassName="size-6"
+        />
       </div>
     </fieldset>
   );
+}
+
+// One row per game: "Game #n" on the left, a compact win/loss pair on the right.
+function GameResultRow({
+  name,
+  gameNum,
+  value,
+  disabled,
+  onChange,
+}: {
+  name: string;
+  gameNum: number;
+  value: boolean | null;
+  disabled?: boolean;
+  onChange: (value: boolean | null) => void;
+}) {
+  const labelId = `${name}-label`;
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      aria-disabled={disabled || undefined}
+      className={`flex items-center justify-between gap-4 ${disabled ? "opacity-40" : ""}`}
+    >
+      <span id={labelId} className="text-sm font-medium select-none">
+        Game #{gameNum} result
+      </span>
+      <div className="grid w-40 grid-cols-2 gap-2">
+        <YesNoButtons
+          name={name}
+          yes={{ value: "win", label: `Won game ${gameNum}` }}
+          no={{ value: "loss", label: `Lost game ${gameNum}` }}
+          selected={yesNoDefault(value, "win", "loss")}
+          onSelect={(v) => onChange(v === undefined ? null : v === "win")}
+          disabled={disabled}
+          className="h-9"
+          iconClassName="size-5"
+        />
+      </div>
+    </div>
+  );
+}
+
+// The check / X radio buttons shared by YesNoCard and GameResultRow.
+function YesNoButtons({
+  name,
+  yes,
+  no,
+  selected,
+  onSelect,
+  disabled,
+  className,
+  iconClassName,
+}: {
+  name: string;
+  yes: YesNoOption;
+  no: YesNoOption;
+  selected: string | undefined;
+  onSelect: (value: string | undefined) => void;
+  disabled?: boolean;
+  className: string;
+  iconClassName: string;
+}) {
+  const options = [
+    { ...yes, OptionIcon: Check, checkedClass: YES_CHECKED_CLASS },
+    { ...no, OptionIcon: X, checkedClass: NO_CHECKED_CLASS },
+  ];
+
+  return options.map(({ value, label, OptionIcon, checkedClass }) => (
+    <label
+      key={value}
+      title={label}
+      className={`flex items-center justify-center rounded-lg border-2 border-input text-muted-foreground transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 ${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${className} ${checkedClass}`}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={value === selected}
+        disabled={disabled}
+        onChange={() => onSelect(value)}
+        // A checked radio fires no change event when clicked again, so
+        // clear it here. `selected` is still the pre-click value, so picking
+        // a new option isn't undone.
+        onClick={() => {
+          if (value === selected) onSelect(undefined);
+        }}
+        aria-label={label}
+        className="sr-only"
+      />
+      <OptionIcon className={iconClassName} strokeWidth={2.5} />
+    </label>
+  ));
 }
