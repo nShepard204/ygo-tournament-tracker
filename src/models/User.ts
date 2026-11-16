@@ -53,7 +53,8 @@ const UserSchema = new Schema({
 export type UserDoc = InferSchemaType<typeof UserSchema>;
 
 // Collection name is set explicitly; Mongoose would otherwise pluralize to "users".
-const COLLECTION = process.env.MONGODB_COLLECTION ?? "app_data";
+// Production builds use "prod"; local development uses "dev".
+const COLLECTION = process.env.NODE_ENV === "production" ? "prod" : "dev";
 
 // Reuse the compiled model across hot reloads to avoid OverwriteModelError.
 export const User: Model<UserDoc> =
