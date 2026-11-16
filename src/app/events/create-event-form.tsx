@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef } from "react";
+import { useActionState, useEffect, useId, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,9 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
   const action = useMemo(() => (event ? updateEvent.bind(null, event.id) : createEvent), [event]);
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, {});
   const formRef = useRef<HTMLFormElement>(null);
+  // Unique per form: on desktop the edit dialog opens while the home page's
+  // new-event form is still mounted, and duplicate ids break the labels.
+  const uid = useId();
 
   useEffect(() => {
     if (!state.success) return;
@@ -47,9 +50,9 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
   return (
     <form ref={formRef} action={submit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label htmlFor="eventName">Event name</Label>
+        <Label htmlFor={`${uid}-eventName`}>Event name</Label>
         <Input
-          id="eventName"
+          id={`${uid}-eventName`}
           name="eventName"
           placeholder="Locals – Friday Night"
           defaultValue={event?.eventName}
@@ -58,9 +61,9 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="eventFormat">Format</Label>
+          <Label htmlFor={`${uid}-eventFormat`}>Format</Label>
           <select
-            id="eventFormat"
+            id={`${uid}-eventFormat`}
             name="eventFormat"
             defaultValue={event?.eventFormat ?? "Advanced"}
             className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
@@ -73,9 +76,9 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
           </select>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="playerCount">Players</Label>
+          <Label htmlFor={`${uid}-playerCount`}>Players</Label>
           <Input
-            id="playerCount"
+            id={`${uid}-playerCount`}
             name="playerCount"
             type="number"
             min={0}
@@ -87,9 +90,9 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
         </div>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="eventDateTime">Date &amp; time</Label>
+        <Label htmlFor={`${uid}-eventDateTime`}>Date &amp; time</Label>
         <Input
-          id="eventDateTime"
+          id={`${uid}-eventDateTime`}
           name="eventDateTime"
           type="datetime-local"
           defaultValue={event ? toLocalInputValue(event.eventDateTime) : undefined}
@@ -97,22 +100,22 @@ export function CreateEventForm({ event, onSuccess }: { event?: EventDTO; onSucc
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="eventLocation">Location</Label>
+        <Label htmlFor={`${uid}-eventLocation`}>Location</Label>
         <Input
-          id="eventLocation"
+          id={`${uid}-eventLocation`}
           name="eventLocation"
           placeholder="Card shop name"
           defaultValue={event?.eventLocation}
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="deck">Deck played</Label>
-        <Input id="deck" name="deck" placeholder="Snake-Eye Fire King" defaultValue={event?.deck} />
+        <Label htmlFor={`${uid}-deck`}>Deck played</Label>
+        <Input id={`${uid}-deck`} name="deck" placeholder="Snake-Eye Fire King" defaultValue={event?.deck} />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="eventNotes">Notes</Label>
+        <Label htmlFor={`${uid}-eventNotes`}>Notes</Label>
         <textarea
-          id="eventNotes"
+          id={`${uid}-eventNotes`}
           name="eventNotes"
           rows={3}
           defaultValue={event?.eventNotes}
